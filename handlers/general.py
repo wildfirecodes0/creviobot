@@ -188,7 +188,8 @@ async def render_history(query, user_id: int, page: int):
 async def history_view(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    _, _, ref_id, page = query.data.split(":")
+    parts = query.data.split(":", 3)
+    _, _, ref_id, page = parts
     page = int(page)
     tx = db.get_transaction_by_ref(ref_id)
     if not tx:

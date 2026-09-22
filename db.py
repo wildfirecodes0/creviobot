@@ -41,6 +41,18 @@ def _run(sql: str, params: list = None, retries: int = 3):
 
         if not data.get("success", False):
             errors = data.get("errors", [])
+            # Check specifically for auth errors (code 10000) — these should not be retried
+            if any(e.get("code") == 10000 for e in errors):
+                log.error(
+                    "D1 Authentication error — check CF_API_TOKEN and CF_ACCOUNT_ID env vars. "
+                    "The token may be expired or have insufficient D1 permissions. "
+                    "sql=%s | errors=%s", sql, errors
+                )
+                raise RuntimeError(
+                    f"D1 Authentication failed (code 10000). "
+                    f"Verify CF_API_TOKEN has 'D1 Edit' permission and is not expired. "
+                    f"errors={errors}"
+                )
             raise RuntimeError(f"D1 query failed: {errors} | sql={sql} | params={params}")
 
         result = data.get("result", [])
@@ -202,11 +214,10 @@ def get_pending_deposit_by_order(order_id: str):
 
 def get_active_trx_pending_amounts():
     """All amounts currently 'reserved' for pending, non-expired TRX deposits."""
-    now = datetime.now(timezone.utc).isoformat()
     rows = _run(
         "SELECT requested_amount, telegram_id, id FROM pending_deposits "
         "WHERE method = 'TRX' AND status = 'pending' AND expires_at > ?",
-        [now],
+        [now_iso()],
     )
     return rows
 
@@ -216,10 +227,9 @@ def mark_deposit_paid(deposit_id: int):
 
 
 def expire_old_deposits():
-    now = datetime.now(timezone.utc).isoformat()
     _run(
         "UPDATE pending_deposits SET status = 'expired' WHERE status = 'pending' AND expires_at <= ?",
-        [now],
+        [now_iso()],
     )
 
 

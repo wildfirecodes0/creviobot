@@ -46,9 +46,14 @@ def get_recent_incoming_transfers(limit: int = 50, since_ts_ms: int = None):
                 if since_ts_ms and ts_ms < since_ts_ms:
                     continue
 
-                # to_address here is base58 already decoded by TronGrid in most
-                # responses' "toAddress" field when present; fall back to hex check
-                to_ok = tx.get("toAddress") == config.TRX_WALLET_ADDRESS or True
+                # TronGrid returns toAddress in base58 at top level for native TRX transfers
+                # Check both the top-level field and the raw contract value field
+                to_address_top = tx.get("toAddress", "")
+                to_address_raw = value.get("to_address", "")
+                to_ok = (
+                    to_address_top == config.TRX_WALLET_ADDRESS
+                    or to_address_raw == config.TRX_WALLET_ADDRESS
+                )
                 if not to_ok:
                     continue
 
@@ -56,6 +61,7 @@ def get_recent_incoming_transfers(limit: int = 50, since_ts_ms: int = None):
                     "tx_hash": tx.get("txID"),
                     "amount_trx": amount_sun / 1_000_000,
                     "timestamp_ms": ts_ms,
+                    "from_address": tx.get("fromAddress", ""),
                 })
         except (KeyError, IndexError, TypeError):
             continue

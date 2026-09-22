@@ -96,7 +96,12 @@ def health():
 
 @flask_app.route(f"/telegram-webhook/{config.TELEGRAM_WEBHOOK_SECRET}", methods=["POST"])
 def telegram_webhook():
-    update = Update.de_json(request.get_json(force=True), telegram_app.bot)
+    data = request.get_json(force=True)
+    if not data:
+        return "Bad Request", 400
+    update = Update.de_json(data, telegram_app.bot)
+    # Fire-and-forget is intentional: Telegram expects a fast 200 response.
+    # process_update runs in the background event loop thread.
     run_async(telegram_app.process_update(update))
     return "OK", 200
 
@@ -142,8 +147,13 @@ async def _credit_inr_deposit(deposit_id: int, telegram_id: str, amount_paid: fl
                     deposit_id, pending["requested_amount"], amount_paid)
         return
 
+    # Prefer telegram_id from DB record (more reliable than webhook notes)
+    try:
+        tid = int(telegram_id) if telegram_id else int(pending["telegram_id"])
+    except (ValueError, TypeError):
+        tid = int(pending["telegram_id"])
+
     db.mark_deposit_paid(deposit_id)
-    tid = int(telegram_id)
     db.add_balance(tid, amount_paid)
     db.add_transaction(tid, "deposit", amount_paid, "INR", "success", {})
 

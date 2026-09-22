@@ -62,7 +62,9 @@ async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def handle_call_number_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    number = update.message.text.strip()
+    raw = update.message.text.strip()
+    # Auto-normalize: if user types 10-digit or 91+10-digit, convert to +91XXXXXXXXXX
+    number = _normalize_own_number(raw)
     if not is_valid_india_number(number):
         await update.message.reply_text(texts.CALL_INVALID_NUMBER)
         return
