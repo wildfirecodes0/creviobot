@@ -101,9 +101,7 @@ def telegram_webhook():
         return "Bad Request", 400
     try:
         update = Update.de_json(data, telegram_app.bot)
-        # Wait with a timeout so exceptions surface in logs
-        future = run_async(telegram_app.process_update(update))
-        future.result(timeout=25)
+        run_async(telegram_app.process_update(update))
     except Exception as e:
         log.exception("Error processing Telegram update: %s", e)
     return "OK", 200
