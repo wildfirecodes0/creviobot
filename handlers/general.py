@@ -44,10 +44,22 @@ async def start_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except ValueError:
                 pass
 
-    row = db.create_user_if_missing(user.id, user.first_name or "Friend", user.username, ref_by)
-    db.update_first_name_username(user.id, user.first_name or "Friend", user.username)
+    try:
+        row = db.create_user_if_missing(user.id, user.first_name or "Friend", user.username, ref_by)
+        db.update_first_name_username(user.id, user.first_name or "Friend", user.username)
+    except Exception as e:
+        log.exception("DB error in start_cmd for user %s: %s", user.id, e)
+        await update.message.reply_text(
+            "⚠️ Service temporarily unavailable. Please try again in a moment."
+        )
+        return
 
-    joined = await is_channel_member(context, user.id)
+    try:
+        joined = await is_channel_member(context, user.id)
+    except Exception as e:
+        log.warning("Channel check failed for %s: %s", user.id, e)
+        joined = row.get("joined_channel", False)
+
     if joined and not row.get("joined_channel"):
         db.set_joined_channel(user.id, True)
         await _credit_referral_if_needed(context, row)
